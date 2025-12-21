@@ -78,7 +78,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add logs README.md src || true
+          git add -A
 
           TYPES=("docs" "chore" "refactor")
           TYPE=${TYPES[$RANDOM % ${#TYPES[@]}]}
