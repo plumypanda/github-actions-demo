@@ -1,5 +1,8 @@
 name: actions-demo
 
+permissions:
+  contents: write
+  
 on:
   schedule:
     # UTC 时间
