@@ -1,0 +1,87 @@
+name: actions-demo
+
+on:
+  schedule:
+    # UTC 时间
+    # 北京时间偶数日 + 单数小时 + 09-22
+    - cron: '0 1-13/2 2-30/2 * *'
+  workflow_dispatch:
+
+jobs:
+  evolve-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set timezone (Asia/Shanghai)
+        run: sudo timedatectl set-timezone Asia/Shanghai
+
+      - name: Runtime validation (human logic)
+        run: |
+          DAY=$(date +%d)
+          HOUR=$(date +%H)
+          WEEKDAY=$(date +%u)
+
+          # 偶数日期
+          if [ $((10#$DAY % 2)) -ne 0 ]; then exit 0; fi
+
+          # 单数小时
+          if [ $((10#$HOUR % 2)) -eq 0 ]; then exit 0; fi
+
+          # 时间范围 09-22（实际到 21）
+          if [ $HOUR -lt 9 ] || [ $HOUR -gt 21 ]; then exit 0; fi
+
+          # 周末降频（仅 09:00 放行）
+          if [ $WEEKDAY -ge 6 ] && [ $HOUR -ne 9 ]; then exit 0; fi
+
+          # 10% 概率什么都不做
+          if [ $((RANDOM % 10)) -eq 0 ]; then
+            echo "Random skip today." && exit 0
+          fi
+
+      - name: Random human delay
+        run: |
+          sleep $((RANDOM % 900))
+
+      - name: Append datetime to monthly log
+        run: |
+          mkdir -p logs
+          FILE="logs/$(date '+%Y-%m').log"
+          echo "$(date '+%Y-%m-%d %H:%M:%S')" >> $FILE
+
+      - name: Developer-like tiny change
+        run: |
+          HOUR=$(date +%H)
+
+          # 上午偏文档，下午偏代码
+          if [ $HOUR -lt 14 ]; then
+            FILE="README.md"
+            mkdir -p .
+            echo "<!-- updated at $(date '+%Y-%m-%d %H:%M:%S') -->" >> $FILE
+
+            # 只保留最近 20 条注释
+            tac $FILE | sed '/updated at/{x;p;x;}' | head -n 20 | tac > /tmp/readme.tmp || true
+            sed '/updated at/d' $FILE >> /tmp/readme.tmp
+            mv /tmp/readme.tmp $FILE
+          else
+            mkdir -p src
+            FILE="src/dev_notes.js"
+            echo "// touched at $(date '+%Y-%m-%d %H:%M:%S')" >> $FILE
+          fi
+
+      - name: Commit changes (ultra natural)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add logs README.md src || true
+
+          TYPES=("docs" "chore" "refactor")
+          TYPE=${TYPES[$RANDOM % ${#TYPES[@]}]}
+
+          git commit -m "$TYPE: small update $(date '+%Y-%m-%d %H:%M')" || exit 0
+          git push
